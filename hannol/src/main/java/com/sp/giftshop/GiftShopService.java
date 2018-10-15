@@ -1,0 +1,20 @@
+package com.sp.giftshop;
+
+import java.util.List;
+import java.util.Map;
+
+public interface GiftShopService {
+	public List<String> gubunList() throws Exception;
+	public int insertGiftGoods(GiftShop dto, String pathname) throws Exception;
+	public int insertFile(Map<String, Object> map) throws Exception;
+	public List<GiftShop> listGiftGoods(Map<String, Object> map) throws Exception;
+	public List<GiftShop> aJaxListGiftGoods(Map<String, Object> map) throws Exception;
+	public int dataCount(Map<String,Object> map) throws Exception;
+	public GiftShop readGoods(int goodsCode) throws Exception;
+	public int deleteFiles(Map<String,Object> map) throws Exception;
+	public int updateGiftGoods(GiftShop dto, String pathname) throws Exception;
+	public int insertCart(Map<String, Object> map) throws Exception;
+	public int dataCountCart(Map<String,Object> map) throws Exception;
+	public List<GiftShop> listCart(long usersCode) throws Exception;
+	public int deleteCart(long[] cartCode) throws Exception;
+}

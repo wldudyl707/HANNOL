@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="coupon">
+	<select id="dataCount" parameterType="map" resultType="Integer">
+		SELECT NVL(COUNT(*),0)
+		FROM 
+		(
+    		SELECT g.payCode, usersCode
+    		FROM ${thema} g
+    		JOIN payment p ON g.payCode = p.payCode
+    		WHERE usersCode = #{usersCode}
+		)
+	</select>
+	
+	<select id="ajaxGiftCouponList" parameterType="map" resultType="com.sp.coupon.Coupon">
+		SELECT * FROM (
+    		SELECT ROWNUM rnum, tb.* FROM(
+        		SELECT g.payCode, usersCode, ${code}, TO_CHAR(endDate,'YYYY-MM-DD') endDate, 
+                    TO_CHAR(${date},'YYYY-MM-DD') ${date}, goodsName, gubunName, quantity, gg.gubunCode, gg.parentCode 
+        		FROM ${thema} g
+        		LEFT OUTER JOIN payment p ON g.payCode = p.payCode
+        		LEFT OUTER JOIN goods gs ON g.goodsCode = gs.goodsCode
+        		LEFT OUTER JOIN goodsGubun gg ON gs.gubunCode = gg.gubunCode
+        		LEFT OUTER JOIN goodsCount gc ON gc.goodsCode = gs.goodsCode
+        		WHERE usersCode = #{usersCode}
+        		ORDER BY ${date} DESC, endDate, goodsCode
+        <![CDATA[
+    		)tb WHERE ROWNUM <= #{end}
+		)WHERE rnum >= #{start}
+		]]>
+	</select>
+	
+	<select id="readGiftCoupon" parameterType="Integer" resultType="com.sp.coupon.Coupon">
+		SELECT giftCode, endDate, useDate, payCode, g.goodsCode, goodsName, gubunName 
+		FROM gift g
+		JOIN goods gs ON g.goodsCode = gs.goodsCode
+		JOIN goodsGubun gg ON gs.gubunCode = gg.gubunCode
+		WHERE giftCode = #{giftCode}
+	</select>
+	
+	<select id="readTicketCoupon" parameterType="Integer" resultType="com.sp.coupon.Coupon">
+		SELECT ticketCode, endDate, startDate, payCode, g.goodsCode, goodsName, gubunName 
+		FROM ticket g
+		JOIN goods gs ON g.goodsCode = gs.goodsCode
+		JOIN goodsGubun gg ON gs.gubunCode = gg.gubunCode
+		WHERE ticketCode = #{ticketCode}
+	</select>
+	
+	<update id="updateGiftCoupon" parameterType="com.sp.coupon.Coupon">
+		UPDATE gift SET useDate = #{useDate}
+		WHERE giftCode = #{giftCode}
+	</update>
+	
+	<update id="updateTicketCoupon" parameterType="com.sp.coupon.Coupon">
+		UPDATE ticket SET startDate = TO_DATE('0001-01-01','YYYY-MM-DD')
+		WHERE ticketCode = #{ticketCode}
+	</update>
+	
+	<update id="updateGoodsCount" parameterType="Integer">
+		UPDATE goodsCount SET quantity = quantity-1 WHERE goodsCode = #{goodsCode}
+	</update>
+	
+	<select id="goodsCount" parameterType="Integer" resultType="Integer">
+		SELECT quantity FROM goodsCount WHERE goodsCode = #{goodsCode}
+	</select>
+	
+	<insert id="insertTicketHistory" parameterType="map">
+		INSERT INTO ticketHistory(ticketCode, useDate)
+		VALUES(#{ticketCode}, #{curDate})
+	</insert>
+	
+	<select id="rankCouponList" parameterType="map" resultType="com.sp.coupon.LankCoupon">
+		SELECT * FROM(
+			SELECT ROWNUM rnum, tb.* FROM(
+				SELECT usersCode,couponMngName couponName, couponCode, TO_CHAR(startDate, 'YYYY-MM-DD') startDate, TO_CHAR(endDate, 'YYYY-MM-DD') endDate, state
+				FROM COUPON c
+				JOIN couponMng cm ON cm.couponMngCode=c.couponMngCode
+				WHERE usersCode=#{usersCode}
+				<if test="order=='recent'">
+					ORDER BY state ASC, issuedDate DESC
+				</if>
+				<if test="order=='endDate'">
+					ORDER BY state ASC, endDate ASC
+				</if>
+			)tb WHERE ROWNUM &lt;= #{end}
+		)WHERE rnum &gt;=#{start}
+	</select>
+	
+	<select id="dataCountRank" parameterType="map" resultType="Integer">
+		SELECT COUNT(*) FROM coupon
+		WHERE usersCode=#{usersCode}
+		<if test="order=='recent'">
+			ORDER BY state ASC, issuedDate DESC
+		</if>
+		<if test="order=='endDate'">
+			ORDER BY state ASC, endDate ASC
+		</if>
+	</select>
+	
+	<select id="gradelist" resultType="com.sp.coupon.Grade">
+		SELECT gradeCode, gradeName, condition, benefit, originalFileName, saveFileName
+		FROM grade
+		ORDER BY condition DESC
+	</select>
+</mapper>

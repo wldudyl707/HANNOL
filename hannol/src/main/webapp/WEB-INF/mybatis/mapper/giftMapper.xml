@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="gift">
+
+	<select id="seq" resultType="Integer">
+			SELECT goods_seq.NEXTVAL FROM dual
+	</select>
+	
+	<select id="listGubun" resultType="java.util.HashMap">
+		SELECT gubuncode, gubunname, parentcode FROM goodsgubun 
+		WHERE gubuncode != 2
+		START WITH gubuncode=2                                  
+		CONNECT BY PRIOR gubuncode=parentcode
+	</select>
+	
+	<select id="ListGift" parameterType="map" resultType="com.sp.giftshop.GiftShop">
+		SELECT * FROM (
+			    SELECT ROWNUM rnum, tb.* FROM(
+			        SELECT goodsCode, goodsName, price, state, gubuncode
+			        FROM goods
+			        WHERE gubuncode IN (
+			        	SELECT gubuncode FROM goodsgubun 
+			            WHERE gubuncode != 2
+			            START WITH gubuncode=2                                  
+			            CONNECT BY PRIOR gubuncode=parentcode
+			        )
+			        AND state = 1
+			        <if test="searchValue != null and searchValue != ''">
+			        	AND INSTR(goodsName, #{searchValue}) &gt; 0
+			        </if>
+			        ORDER BY goodsCode DESC
+			    ) tb
+			    WHERE ROWNUM &lt;= #{end}
+		)WHERE rnum &gt;=#{start}
+	</select>
+	
+	<select id="readGoodsImg" parameterType="Long" resultType="map">
+		 SELECT * FROM (
+		    select goodsImgCode, saveFileName, originalFileName, goodsCode
+		    FROM goodsImg
+		    WHERE goodsCode = #{goodsCode}
+		    ORDER BY goodsImgCode
+		 )WHERE rownum=1
+	</select>
+	
+	<select id="ListGoodsImg" parameterType="Long" resultType="map">
+	    select goodsImgCode, saveFileName, originalFileName, goodsCode
+	    FROM goodsImg
+	    WHERE goodsCode = #{goodsCode}
+	    ORDER BY goodsImgCode
+	</select>
+	
+	<select id="dataCount" parameterType="map" resultType="Integer">
+	 	SELECT COUNT(*) FROM goods
+        <include refid="where-thema-list"/>
+        AND state = 1
+        <if test="searchValue != null and searchValue != ''">
+        	AND INSTR(goodsName, #{searchValue}) &gt; 0
+        </if>
+	</select>
+	
+	<sql id="where-ajax-list">
+		<if test="order=='newGoods'">
+			ORDER BY goodsCode DESC
+		</if>
+		<if test="order=='minPrice'">
+			ORDER BY price ASC
+		</if>
+		<if test="order=='maxPrice'">
+			ORDER BY price DESC
+		</if>
+		<if test="order=='likeGoods'">
+			ORDER BY likeCount DESC
+		</if>
+	</sql>
+	
+	<sql id="where-thema-list">
+		<if test="thema==0">
+			 WHERE gubuncode IN (
+	        	SELECT gubuncode FROM goodsgubun 
+	            WHERE gubuncode != 2
+	            START WITH gubuncode=2                                  
+	            CONNECT BY PRIOR gubuncode=parentcode
+	         )
+		</if>
+		<if test="thema!=0">
+			 WHERE gubuncode = #{thema}
+		</if>
+	</sql>
+	
+	<select id="ajaxListGift" parameterType="map" resultType="com.sp.giftshop.GiftShop">
+		SELECT * FROM (
+				    SELECT ROWNUM rnum, tb.* FROM(
+				        SELECT g.goodsCode, goodsName, price, state, gubuncode, NVL(likeGoods,0) likeCount, NVL(quantity,0) quantity
+				        FROM goods g 
+                        LEFT JOIN (
+                            select SUM(quantity) likeGoods, goodsCode from paymentInfo
+                            GROUP BY goodscode
+                        ) p ON g.goodsCode=p.goodsCode
+                        LEFT JOIN goodsCount c ON g.goodsCode = c.goodsCode
+				        <include refid="where-thema-list"/>
+				        AND state = 1
+				        <if test="searchValue != null and searchValue != ''">
+				        	AND INSTR(goodsName, #{searchValue}) &gt; 0
+				        </if>
+				        <if test="order != null and order !=''">
+				        	<include refid="where-ajax-list"/>
+				        </if>
+				    ) tb
+				    WHERE ROWNUM &lt;= #{end}
+			)WHERE rnum &gt;=#{start}
+	</select>
+	
+	<select id="readGift" parameterType="Integer" resultType="com.sp.giftshop.GiftShop">
+		SELECT g.goodsCode, goodsName, price, state, g.gubuncode, gubunName, memo as content, NVL(likeGoods,0) likeCount, NVL(quantity,0) quantity, parentCode
+		FROM goods g 
+		LEFT JOIN (
+		    select SUM(quantity) likeGoods, goodsCode from paymentInfo
+		    GROUP BY goodscode
+		) p ON g.goodsCode=p.goodsCode
+		LEFT JOIN goodsCount c ON g.goodsCode = c.goodsCode
+		LEFT JOIN goodsGubun b ON g.gubuncode = b.gubuncode
+		LEFT JOIN goodsInfo gi ON g.goodsCode = gi.goodsCode
+		WHERE g.goodsCode = #{goodsCode}
+	</select>
+	
+	<insert id="insertCart" parameterType="map">
+	    INSERT INTO cart(cartCode, quantity, goodsCode, usersCode) 
+    	VALUES (cart_seq.NEXTVAL, #{quantity}, #{goodsCode}, #{usersCode})
+	</insert>	
+	
+	<select id="readCartOne" parameterType="map" resultType="Integer">
+	    SELECT COUNT(quantity) quantity From cart
+		WHERE usersCode=#{usersCode} and goodsCode=#{goodsCode}
+	</select>
+	
+	<select id="cartList" parameterType="Long" resultType="com.sp.giftshop.GiftShop">
+		SELECT cartCode, c.quantity, c.goodsCode, goodsName, price, g.gubuncode, parentcode, gubunName
+		FROM cart c
+		JOIN goods g ON c.goodsCode = g.goodsCode
+		JOIN goodsGubun gb ON g.gubuncode=gb.gubuncode
+		WHERE usersCode=#{usersCode} and state=1
+		ORDER BY cartCode DESC
+	</select>
+	
+	<delete id="deleteCart" parameterType="Long">
+		DELETE FROM cart
+		WHERE cartCode = #{cartCode}
+	</delete>
+		
+</mapper>

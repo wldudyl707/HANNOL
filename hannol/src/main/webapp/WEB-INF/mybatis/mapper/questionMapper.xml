@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="question">
+	<insert id="insertQuestion" parameterType="com.sp.question.Question">
+		INSERT INTO question(qnaCode, gubun, subject, content, parentCode, usersCode)
+		VALUES(question_seq.NEXTVAL, #{gubun}, #{subject}, #{content}, #{parentCode}, #{usersCode})
+	</insert>
+	
+	<select id="dataCount" parameterType="Integer" resultType="Integer">
+		SELECT COUNT(*) FROM question WHERE usersCode = #{usersCode}
+	</select>
+	
+	<select id="listQuestion" parameterType="map" resultType="com.sp.question.Question">
+		SELECT * FROM(
+		    SELECT ROWNUM rnum, tb.* FROM(
+		        SELECT q.qnaCode, gubun, subject, TO_CHAR(qDate,'YYYY-MM-DD') qDate, q.parentCode, a.qnaCode as answer
+		        FROM question q
+		        LEFT OUTER JOIN (
+		            SELECT qnaCode, parentCode
+		            FROM question 
+		            WHERE parentCode != 0
+		        )a ON a.parentCode=q.qnaCode  
+		        WHERE usersCode = #{usersCode}
+		<![CDATA[
+		    )tb WHERE ROWNUM <= #{end} 
+		    ORDER BY qDate DESC
+		)WHERE rnum >= #{start}
+		]]>
+	</select>
+	
+	<select id="readQuestion" parameterType="Integer" resultType="com.sp.question.Question">
+		SELECT qnaCode, gubun, subject, content, TO_CHAR(qDate,'YYYY-MM-DD') qDate, parentCode, usersCode
+		FROM question
+		WHERE qnaCode = #{num}
+	</select>
+	
+	<update id="updateQuestion" parameterType="com.sp.question.Question">
+		UPDATE question SET gubun=#{gubun}, subject=#{subject}, content=#{content} WHERE qnaCode=#{qnaCode}
+	</update>
+	
+	<delete id="deleteQuestion" parameterType="Integer">
+		DELETE FROM question WHERE qnaCode = #{num} OR parentCode = #{num}
+	</delete>
+	
+	<select id="readAnswer" parameterType="Integer" resultType="com.sp.question.Question">
+		SELECT content FROM question WHERE parentCode = #{num}
+	</select>
+</mapper>

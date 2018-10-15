@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="ticket">
+	<select id="listTicket" resultType="com.sp.ticket.Ticket">
+		SELECT goodsCode, goodsName, price as goodsPrice, state, g.gubunCode , gubunName, parentCode
+		FROM goods g
+		LEFT JOIN goodsgubun gb ON g.gubunCode = gb.gubunCode
+		WHERE g.gubunCode IN (
+		    SELECT gubuncode FROM goodsgubun 
+		    WHERE gubuncode != 1
+		    START WITH gubuncode=1                                  
+		    CONNECT BY PRIOR gubuncode=parentcode
+		)AND state=1
+		ORDER BY g.gubunCode DESC, price DESC
+	</select>
+	
+	<select id="checkReservation" parameterType="map" resultType="Integer">
+		SELECT COUNT(*) limitTicket FROM payment p
+		LEFT JOIN TICKET t  on p.paycode = t.paycode
+		WHERE gubun in (
+		    SELECT gubuncode FROM goodsgubun 
+		    WHERE gubuncode != 1 and gubuncode !=8
+		    START WITH gubuncode=1                                  
+		    CONNECT BY PRIOR gubuncode=parentcode
+		) AND usersCode = #{usersCode}
+		AND t.STARTDATE BETWEEN TO_DATE(#{day}, 'YYYY-MM-DD') and TO_DATE(#{day}, 'YYYY-MM-DD')
+	</select>
+	
+	<select id="ListYearTicket" resultType="com.sp.ticket.Ticket">
+		SELECT goodsCode, goodsName, price as goodsPrice, state, g.gubunCode , gubunName, parentCode
+		FROM goods g
+		LEFT JOIN goodsgubun gb ON g.gubunCode = gb.gubunCode
+		WHERE g.gubunCode IN (
+		    SELECT gubuncode FROM goodsgubun 
+		    WHERE gubuncode = 8
+		)AND state=1
+		ORDER BY g.gubunCode DESC, price DESC
+	</select>
+	
+	<select id="checkYearTicket" resultType="Integer" parameterType="map">
+	SELECT count(*) cnt
+	FROM payment p
+	LEFT JOIN ticket t ON p.payCode=t.payCode
+	WHERE gubun=8 AND usersCode = #{usersCode} AND
+	#{today} between STARTDATE and ENDDATE
+	</select>
+	
+	<select id="chechUserBirth" resultType="String" parameterType="Long">
+		SELECT TO_CHAR(birth, 'YYYY-MM-DD') birth FROM member2
+    	WHERE usersCode = #{usersCode}
+	</select>
+	
+</mapper>

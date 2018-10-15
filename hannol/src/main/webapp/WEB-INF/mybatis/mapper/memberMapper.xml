@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="member">
+	<select id="loginMember" parameterType="String" resultType="com.sp.member.Member">
+		SELECT usersCode, memberId, memberPwd, memberName, authority FROM member1 WHERE memberId=#{memberId} AND enabled=1
+	</select>
+	
+	
+	<!-- usersCode sequence -->
+	<select id="usersSeq" resultType="Long">
+		select users_seq.nextval from dual
+	</select>
+	
+	<!-- 유저 insert -->
+	<insert id="insertUsers" parameterType="Long">
+		insert into users(usersCode, authority)
+		values(#{usersCode}, 'ROLE_USER')
+	</insert>
+	
+	<!-- member1 insert -->
+	<insert id="insertMember1" parameterType="com.sp.member.Member">
+		insert into member1(usersCode, memberId, memberPwd, memberName, enabled, authority)
+		values(#{usersCode}, #{memberId}, #{memberPwd, jdbcType=VARCHAR}, #{memberName}, 1, 'ROLE_USER')
+	</insert>
+	
+	<!-- member2 insert -->
+	<insert id="insertMember2" parameterType="com.sp.member.Member">
+		insert into member2(usersCode, help, email, birth, post, addr1, addr2, tel, joinDate, joinPath, loginDate, gradeCode)
+		values(#{usersCode}, #{help, jdbcType=VARCHAR}, #{email, jdbcType=VARCHAR}, #{birth, jdbcType=VARCHAR}, 
+			#{post, jdbcType=VARCHAR}, #{addr1, jdbcType=VARCHAR}, #{addr2, jdbcType=VARCHAR}, 
+			#{tel, jdbcType=VARCHAR}, sysdate, #{joinPath}, #{loginDate, jdbcType=VARCHAR}, 3)
+	</insert>
+	
+	<select id="readMember" parameterType="String" resultType="com.sp.member.Member">
+      select m1.usersCode, memberId, memberPwd, memberName, enabled, authority,
+		    help, email, to_char(birth, 'yyyy-mm-dd') birth, post, addr1, addr2, tel, joinDate, joinPath, 
+		    loginDate, m2.gradeCode, saveFileName
+	  from member1 m1 
+	  join member2 m2 on m1.USERSCODE = m2.USERSCODE
+	  JOIN grade g ON g.gradeCode = m2.gradeCode
+      WHERE memberId = #{userId}
+   </select>
+   
+   <update id="updateLastLogin" parameterType="Long">
+      UPDATE member2 SET loginDate = SYSDATE WHERE usersCode = #{usersCode}
+   </update>
+
+	<update id="updatePwd" parameterType="com.sp.member.Member">
+		update member1 set memberPwd = #{memberPwd} 
+		where usersCode = #{usersCode}
+	</update>   
+	
+	<select id="readMemberByEmail" parameterType="String" resultType="com.sp.member.Member">
+		select usersCode, help, email, birth, post, addr1, addr2, tel, joinDate, joinPath, loginDate, gradeCode
+		from member2
+		where email = #{email}
+	</select>
+	
+	<update id="updateMember1" parameterType="com.sp.member.Member">
+		update member1 set memberPwd = #{memberPwd}
+		where memberId = #{memberId}
+	</update>
+	
+	<update id="updateMember2" parameterType="com.sp.member.Member">
+		update member2 set 
+			help = #{help, jdbcType=VARCHAR}, email = #{email, jdbcType=VARCHAR}, birth = #{birth, jdbcType=VARCHAR}, 
+			post = #{post, jdbcType=VARCHAR}, addr1 = #{addr1, jdbcType=VARCHAR}, addr2 = #{addr2, jdbcType=VARCHAR}, tel = #{tel, jdbcType=VARCHAR}
+		where usersCode = (
+			select usersCode from member1 where memberId = #{memberId}
+		)
+	</update>
+	
+	<!-- 회원탈퇴 -->
+	<update id="deleteMember" parameterType="String">
+		update member1 set enabled = 0 
+		where memberId = #{memberId}
+	</update>
+	
+</mapper>

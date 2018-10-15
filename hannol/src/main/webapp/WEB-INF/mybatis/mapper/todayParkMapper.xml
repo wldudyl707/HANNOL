@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="today">
+
+	<select id="dataCount" parameterType="map" resultType="Integer">
+		select count (*) FROM 
+		(select f.facilityCode, name, state, f.themeCode,originalMainFilename,saveMainFilename, memo
+	            from facility f
+	            left join theme t on f.themeCode = t.themeCode
+	            where gubunCode=1 and f.themeCode= #{code})
+	</select>
+	
+	<select id="listTodayCal" parameterType="map" resultType="com.sp.today.Today">
+<!-- 		select * from (
+   		select rownum rnum, tb.* from (
+				select f.facilityCode, name, state, f.themeCode,originalMainFilename,saveMainFilename, memo
+	            from facility f
+	            left join theme t on f.themeCode = t.themeCode
+	            left join ridesState r on f.facilityCode= r.facilityCode
+	            where gubunCode=1 and f.themeCode= #{code} and 
+	            <if test="yyyymmdd != null and hh != null">
+		            to_char(recordDate,'yyyymmdd')=#{yyyymmdd} and timezone=#{hh}	            
+	            </if>
+		order by waiting desc
+	            
+		<![CDATA[
+				) tb where rownum <= #{end}
+			)where rnum >= #{start}	
+		]]>
+		
+		 -->
+		
+		select test.facilityCode, test.name, test.state, test.themeCode, test.originalMainFilename, test.saveMainFilename, test.memo, tb.waiting, tb.timezone, tb.recordDate
+    	from (
+	        select f.facilityCode, name, state, f.themeCode,originalMainFilename,saveMainFilename, memo, waiting,timezone,recordDate
+	        from facility f
+	        left join theme t on f.themeCode = t.themeCode
+	        left join ridesState r on f.facilityCode= r.facilityCode
+	        where gubunCode=1 and f.themeCode= #{code} and to_char(recordDate,'yyyymmdd')=#{yyyymmdd} and timezone = 18
+	        order by ${orderby} desc
+   		 ) tb
+   		 right outer join
+	        (select f.facilityCode, name, state, f.themeCode,originalMainFilename,saveMainFilename, memo
+	        from facility f
+	        left join theme t on f.themeCode = t.themeCode
+	        where gubunCode=1 and f.themeCode= #{code}) test
+		  on test.facilityCode = tb.facilityCode
+		  order by ${orderby}
+		
+	</select>
+	
+	
+	<select id="listToday2" resultType="com.sp.today.Today">
+
+	   select facilityCode, name, state, originalMainFilename,saveMainFilename, memo 
+       from facility 
+       where gubunCode=1
+
+	</select>
+	
+	<select id="calcul" parameterType="map" resultType="Integer">
+
+		select waiting
+		from facility f
+		left join ridesState r on f.facilityCode = r.facilityCode
+		left join theme t on f.themeCode = t.themeCode
+		where gubunCode=1 and timezone=#{hh} and to_char(recordDate,'yyyymmdd')=#{yyyymmdd} and f.themeCode= #{code} and f.facilityCode=#{facilityCode}
+	
+	</select>
+	
+</mapper>

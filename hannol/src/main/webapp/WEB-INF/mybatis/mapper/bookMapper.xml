@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="book">
+	<select id="dataCount" parameterType="map" resultType="Integer">
+		SELECT NVL(COUNT(*),0)
+		FROM GUIDE G
+		LEFT OUTER JOIN GUIDEBOOK GB ON G.SCHCODE = GB.SCHCODE
+		WHERE GB.USERSCODE = #{usersCode}
+	</select>
+	
+	<select id="listMybook" parameterType="map" resultType="com.sp.mypage.Mybook">
+		select * from (
+   		select rownum rnum, tb.* from (
+				SELECT G.SCHCODE, TIMEZONE, TO_CHAR(WORKDATE,'YYYY-MM-DD') WORKDATE, ROLE, MEMO, G.USERSCODE,
+		        	BOOKCODE, GB.NAME, TEL,  TO_CHAR(BOOKDATE,'YYYY-MM-DD') BOOKDATE
+				FROM GUIDE G
+		        LEFT OUTER JOIN GUIDEBOOK GB ON G.SCHCODE = GB.SCHCODE
+				WHERE G.SCHCODE !=0
+					AND GB.USERSCODE = #{usersCode}
+				ORDER BY BOOKDATE DESC
+		<![CDATA[
+				) tb where rownum <= #{end}
+			)where rnum >= #{start}	
+		]]>
+	</select>
+	
+	<delete id="deleteGuideBook" parameterType="Integer">
+		DELETE FROM GUIDEBOOK WHERE BOOKCODE = #{bookCode}
+	</delete>
+	
+	<select id="dataCountMagic" parameterType="map" resultType="Integer">
+		SELECT COUNT(*) FROM (
+		    SELECT m.facilitycode, name, mpTime, COUNT(ticketCode) cnt, TO_CHAR(mpDate, 'YYYY-MM-DD') mpDate
+	        FROM magicpass m
+	        JOIN facility f ON m.facilitycode=f.facilitycode
+	        WHERE usersCode=#{usersCode}
+	        group by m.FACILITYCODE, name, mpTime, TO_CHAR(mpDate, 'YYYY-MM-DD')
+	        ORDER BY mpDate DESC, mpTime DESC, facilityCode ASC
+		)
+	</select>
+	
+	<select id="listMymagic" parameterType="map" resultType="com.sp.magicpass.MagicPass">
+		SELECT * FROM(
+		    SELECT ROWNUM rnum, tb.* FROM (
+		        SELECT m.facilitycode, name, mpTime, COUNT(ticketCode) cnt, TO_CHAR(mpDate, 'YYYY-MM-DD') mpDate
+		        FROM magicpass m
+		        JOIN facility f ON m.facilitycode=f.facilitycode
+		        WHERE usersCode=#{usersCode}
+		        group by m.FACILITYCODE, name, mpTime, TO_CHAR(mpDate, 'YYYY-MM-DD')
+		        ORDER BY mpDate DESC, mpTime DESC, facilityCode ASC
+		    )tb WHERE ROWNUM &lt;=#{end}
+		)WHERE rnum &gt;=#{start}
+	</select>
+	
+	<delete id="deleteMagic" parameterType="map">
+		DELETE FROM magicpass
+		WHERE TO_CHAR(mpDate, 'YYYY-MM-DD')=#{mpDate} 
+		AND usersCode = #{usersCode} 
+		AND facilitycode=#{facilityCode} 
+		AND mpTime=${mpTime}	
+	</delete>
+	
+	
+	<!-- 편의시설 예약 총개수 -->
+	<select id="dataCountAssets" resultType="Integer" parameterType="map">
+		SELECT COUNT(*) FROM(
+			SELECT bookCode, ab.name, tel, TO_CHAR(useDate, 'YYYY-MM-DD') useDate, TO_CHAR(bookDate, 'YYYY-MM-DD') bookDate, bookTime, ab.state, ab.assetsCode, f.name facName, f.facilityCode
+	        FROM assetsBook ab
+	        LEFT OUTER JOIN assets a ON ab.assetsCode = a.assetsCode
+	        LEFT OUTER JOIN assetsGubun ag ON a.gubunCode = ag.gubunCode
+	        LEFT OUTER JOIN facility f ON a.facilityCode = f.facilityCode
+	        WHERE usersCode=#{usersCode} 
+	        ORDER BY useDate
+		)    
+	</select>
+	
+	<!-- 편의시설 예약 리스트 -->
+	<select id="assetsBookList" resultType="com.sp.assets.Assets" parameterType="map">
+		SELECT * FROM( 
+		    SELECT ROWNUM rnum, tb.* FROM(
+		        SELECT bookCode, ab.name, tel, TO_CHAR(useDate, 'YYYY-MM-DD') useDate, TO_CHAR(bookDate, 'YYYY-MM-DD') bookDate, bookTime, ab.state, ab.assetsCode, f.name facName, f.facilityCode
+		        FROM assetsBook ab
+		        LEFT OUTER JOIN assets a ON ab.assetsCode = a.assetsCode
+		        LEFT OUTER JOIN assetsGubun ag ON a.gubunCode = ag.gubunCode
+		        LEFT OUTER JOIN facility f ON a.facilityCode = f.facilityCode
+		        WHERE usersCode=#{usersCode} 
+		        ORDER BY useDate DESC, bookCode DESC  
+		    ) tb WHERE ROWNUM &lt;= #{end}
+		) WHERE rnum &gt;= #{start}
+	</select>
+	
+	<!-- 예약 삭제 -->
+	<delete id="deleteAssetsBook" parameterType="Integer">  
+		DELETE FROM assetsBook WHERE bookCode = #{booksCode} 	
+	</delete> 
+	
+	<!-- 기간만료 -->
+	<update id="expireAssetsBook" parameterType="Integer">  
+		 UPDATE assetsBook SET state = 4 WHERE bookCode=#{num} 	
+	</update>  
+</mapper>

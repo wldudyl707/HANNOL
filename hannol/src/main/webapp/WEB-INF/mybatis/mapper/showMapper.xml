@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="show">
+	<select id="listShowTime" parameterType="map" resultType="String">
+		select startTime from showStartTIme
+		where schCode = (
+		    select schCode
+		    from showSch
+		    where screenDate = #{screenDate} and showInfoCode = #{showInfoCode})
+		order by startTime
+	</select>
+	
+	<select id="listShow" parameterType="map" resultType="com.sp.show.Show">
+		select s.showCode, showName, memo, saveFilename, s.gubunCode, showInfoCode, facilityCode, name
+		from show s 
+		join showGubun sg
+		    on s.GUBUNCODE = sg.GUBUNCODE
+		join (select showCode, showInfoCode, s.facilityCode, name
+		    from showInfo s join facility f
+		        on f.facilityCode = s.facilityCode
+		    where showInfoCode in (
+		        select showInfoCode
+		        from showSch
+		        where screenDate = #{screenDate})) si
+		    on s.showCode = si.showCode
+		where s.gubunCode = #{gubunCode}
+	</select>
+	
+	<select id="readSeatCount" parameterType="Integer" resultType="Integer">
+		select nvl(seatCount, 0) seatCount
+		from facility f left outer join stage s
+			on f.FACILITYCODE = s.FACILITYCODE
+		where gubuncode = 3 and f.facilitycode = #{facilityCode}
+	</select>
+	
+	<select id="readShowInfo" parameterType="map" resultType="com.sp.show.Show">
+		select s.showCode, showName, memo, saveFilename, name,
+		    startDate, endDate, runningTime, saveLocFilename, facilityCode 
+		from show s 
+		join showGubun sg
+		    on s.GUBUNCODE = sg.GUBUNCODE
+		join (select showCode, showInfoCode, s.facilityCode, name, 
+		        to_char(startDate, 'yyyy-mm-dd') startDate, to_char(endDate, 'yyyy-mm-dd') endDate, runningTime, f.saveLocFilename
+		    from showInfo s join facility f
+		        on f.facilityCode = s.facilityCode
+		    where showInfoCode in (
+		        select showInfoCode
+		        from showSch
+		        where screenDate = #{screenDate})) si
+		    on s.showCode = si.showCode
+		where showInfoCode = #{showInfoCode}
+	</select>
+	
+	<select id="listTicket" parameterType="map" resultType="com.sp.show.Ticket">
+		select ticketCode, startDate, endDate, gubun
+		from ticket
+		where payCode in (
+			    select payCode from payment
+			    where usersCode = (
+			        select usersCode from member1
+			        where memberId = #{memberId}
+			    )
+			)
+		<![CDATA[
+			and startDate <= to_date(#{screenDate}, 'yyyy-mm-dd')
+			and to_date(#{screenDate}, 'yyyy-mm-dd') <= endDate
+		]]>
+	</select>
+	
+	<!-- 예약좌석 리스트 -->
+ 	<select id="listSeat" parameterType="map" resultType="Integer">
+		select seatNum
+		from showbookinfo
+		where sStartCode = (
+		    select sStartCode
+		    from showStartTime
+		    where startTime = #{startTime} and schCode = (
+		        select schCode
+		        from showSch
+		        where screenDate = #{screenDate} and showInfoCode = #{showInfoCode})
+		)
+	</select>
+	
+	<!-- sStartCode  -->
+	<select id="readSstartCode" parameterType="map" resultType="Integer">	
+		select sStartCode
+        from showStartTime
+        where startTime = #{startTime} and schCode = (
+            select schCode
+            from showSch
+            where screenDate = #{screenDate} and showInfoCode = #{showInfoCode})
+	</select>
+
+
+	<!-- 공연 예약 insert -->
+	<insert id="insertShowBook" parameterType="map">
+		insert into showBook(showBookCode, bookDate, bookCount, usersCode, sStartCode, ticketCode)
+		values(showBook_seq.nextval, sysdate, #{bookCount}, #{usersCode}, #{sStartCode}, #{ticketCode})
+	</insert>
+
+	<select id="readShowBookCode" parameterType="map" resultType="Integer">
+		select showBookCode
+		from showBook
+		where usersCode = #{usersCode} and sStartCode = #{sStartCode}
+	</select>
+
+	<!-- 공연 예약 상세 insert -->
+	<insert id="insertShowBookInfo" parameterType="map">
+		insert into showBookInfo(sStartCode, seatNum, showBookCode)
+		values(#{sStartCode}, #{seatNum}, #{showBookCode})
+	</insert>
+
+
+	<!-- 공연 예약 중복 검사 -->
+	<select id="readShowBookCount" parameterType="map" resultType="Integer">
+		select count(*)
+		from showBook
+		where usersCode = #{usersCode} and sStartCode = #{sStartCode}
+	</select>
+	
+	<!-- 공연 예약 상세 삭제 -->
+	<delete id="deleteShowBookInfo" parameterType="Integer">
+		delete from showbookinfo
+		where showBookCode = #{showBookCode}
+	</delete>
+
+	<!-- 공연 예약 삭제 -->
+	<delete id="deleteShowBook" parameterType="Integer">
+		delete from showbook
+		where showBookCode = #{showBookCode}
+	</delete>
+	
+	
+	<!-- 내 공연 예약 리스트 -->
+	<select id="listMyShow" parameterType="Integer" resultType="com.sp.show.Show">
+		select showBookCode, bookDate, sb.sStartCode, startTime, to_char(screenDate, 'yyyy-mm-dd') screenDate, f.name, showname
+		from showBook sb join showStartTime sst
+		    on sb.sStartCode = sst.sStartCode
+		join showSch sch
+		    on sst.schCode = sch.schCode
+		join showInfo si	
+		    on sch.showInfoCode = si.showInfoCode
+		join facility f
+		    on si.FACILITYCODE = f.FACILITYCODE
+		join show s
+		    on si.showCode = s.SHOWCODE
+		where usersCode = #{usersCode}
+		order by screenDate desc		
+	</select>
+	
+	<!-- 내 공연 예약 좌석 리스트 -->
+	<select id="listMyShowSeat" parameterType="Integer" resultType="Integer">
+		select seatNum 
+		from showBookInfo
+		where showBookCode = #{showBookCode}
+	</select>
+	
+	
+	<!-- 이용권 발급 리스트 -->
+	<select id="readTicketCodeByPayCode" parameterType="Integer" resultType="Integer">
+		select ticketCode 
+	    from ticket
+	    where payCode = #{payCode}
+	</select>
+	
+	<!-- 티켓코드->공연예약코드 -->
+	<select id="readShowBookCodeByTicketCode" parameterType="Integer" resultType="Integer">
+		select showBookCode
+		from showBook
+		where ticketCode = #{ticketCode}
+	</select>
+
+
+</mapper>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="guide">
+	 <select id="staffList" resultType="com.sp.guide.Guide">
+		SELECT USERSCODE, NAME
+		FROM STAFF 
+		WHERE DPCODE=4 AND POSITIONCODE=4
+	</select>
+	
+	<insert id="insertGuide" parameterType="com.sp.guide.Guide">
+		INSERT INTO GUIDE(SCHCODE, GUIDENAME, TIMEZONE, WORKDATE, ROLE, MEMO, USERSCODE)
+		VALUES(GUIDE_SEQ.NEXTVAL, #{name}, #{timezone}, #{workDate}, #{role}, #{memo}, #{usersCode})
+	</insert>
+	
+	<select id="getName" parameterType="Integer" resultType="String">
+		SELECT NAME FROM STAFF WHERE USERSCODE= #{usersCode}
+	</select>
+	
+	<select id="guideList" resultType="com.sp.guide.Guide">
+		SELECT G.SCHCODE, GUIDENAME AS NAME, TIMEZONE,WORKDATE, ROLE, MEMO, G.USERSCODE,
+        BOOKCODE
+		FROM GUIDE G
+        LEFT OUTER JOIN GUIDEBOOK GB ON G.SCHCODE = GB.SCHCODE
+		WHERE G.SCHCODE !=0
+	</select>
+	
+	<select id="readInfo" parameterType="Integer" resultType="com.sp.guide.Guide">
+		SELECT G.SCHCODE, GUIDENAME, TIMEZONE, TO_CHAR(WORKDATE,'YYYY-MM-DD') WORKDATE, ROLE, MEMO, G.USERSCODE,
+		GB.USERSCODE AS USERSCODEM, BOOKCODE, TO_CHAR(BOOKDATE,'YYYY-MM-DD') BOOKDATE, TEL, NAME AS NAMEM,
+		MEMBERID
+		FROM GUIDE G
+		LEFT OUTER JOIN GUIDEBOOK GB ON G.SCHCODE = GB.SCHCODE
+		LEFT OUTER JOIN MEMBER1 M ON M.USERSCODE = GB.USERSCODE
+		WHERE G.SCHCODE = #{schCode}
+	</select>
+
+	<update id="beforeDelete" parameterType="Integer">
+		UPDATE GUIDEBOOK SET SCHCODE = 0 WHERE SCHCODE = #{schCode}
+	</update>
+
+	<delete id="deleteSch" parameterType="Integer">
+		DELETE FROM GUIDE WHERE SCHCODE = #{schCode}
+	</delete>
+	
+	<insert id="insertBook" parameterType="com.sp.guide.Guide">
+		INSERT INTO GUIDEBOOK(BOOKCODE, SCHCODE, NAME, TEL, USERSCODE, BOOKDATE)
+		VALUES(GUIDEBOOK_SEQ.NEXTVAL, #{schCode}, #{nameM},#{tel}, #{usersCodeM}, SYSDATE)
+	</insert>
+	
+	
+	<select id="checkTicket1" parameterType="Integer" resultType="com.sp.guide.Guide">
+		SELECT TICKETCODE, M1.USERSCODE AS usersCodeM, TO_CHAR(STARTDATE,'YYYY-MM-DD') STARTDATE, TO_CHAR(ENDDATE,'YYYY-MM-DD') ENDDATE, GUBUN
+		FROM TICKET T
+		JOIN PAYMENT P ON P.PAYCODE = T.PAYCODE
+		JOIN MEMBER1 M1 ON M1.USERSCODE = P.USERSCODE
+		WHERE M1.USERSCODE = #{usersCode} AND (GUBUN != 5 AND GUBUN != 6 )
+	</select>
+	
+	
+	<select id="checkTicket2" parameterType="Integer" resultType="com.sp.guide.Guide">
+		SELECT TICKETCODE, M1.USERSCODE AS usersCodeM, TO_CHAR(STARTDATE,'YYYY-MM-DD') STARTDATE, TO_CHAR(ENDDATE,'YYYY-MM-DD') ENDDATE, GUBUN
+		FROM TICKET T
+		JOIN PAYMENT P ON P.PAYCODE = T.PAYCODE
+		JOIN MEMBER1 M1 ON M1.USERSCODE = P.USERSCODE
+		WHERE M1.USERSCODE = #{usersCode} 
+	</select>
+	
+	<select id="checkDoublebook" parameterType="map" resultType="Integer">
+		SELECT NVL(COUNT(*),0) 
+		FROM GUIDEBOOK GB
+		JOIN GUIDE G ON G.SCHCODE = GB.SCHCODE
+		WHERE WORKDATE = #{workDate} AND GB.USERSCODE = #{usersCodeM}
+	</select> 
+	
+	<select id="okTicketIfPayCancled" parameterType="Integer" resultType="Integer">
+		SELECT NVL(COUNT(*),0)
+		FROM PAYMENT P
+		JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		WHERE USERSCODE = (
+            SELECT DISTINCT USERSCODE
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+        )
+        AND STARTDATE = (
+		    SELECT DISTINCT STARTDATE 
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+		)
+		AND P.PAYCODE != #{payCode}
+	</select>
+	
+	<select id="okMorningTicketIfPayCancled" parameterType="Integer" resultType="Integer">
+		SELECT NVL(COUNT(*),0)
+		FROM PAYMENT P
+		JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		WHERE USERSCODE = (
+            SELECT DISTINCT USERSCODE
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+        )
+         AND (GUBUN != 5 OR GUBUN != 6)  AND STARTDATE = (
+		    SELECT DISTINCT STARTDATE 
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+		)
+		AND P.PAYCODE != #{payCode}
+	</select>
+	
+	<select id="getGuideBookCancleDay" parameterType="Integer" resultType="com.sp.guide.Guide">
+		SELECT G.SCHCODE, TIMEZONE, WORKDATE
+		FROM GUIDE G
+        JOIN GUIDEBOOK GB ON G.SCHCODE = GB.SCHCODE
+		WHERE GB.USERSCODE = (
+		    SELECT DISTINCT USERSCODE
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+		) 
+		AND WORKDATE = (
+		    SELECT DISTINCT STARTDATE 
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+		)
+	</select>
+	
+	<!-- 결제취소 제외하고 사용가능한 이용권수가 0이면 예약 취소 -->
+	<delete id="deleteGuidebookIfPayCanceled" parameterType="Integer">
+		DELETE FROM GUIDEBOOK
+		WHERE SCHCODE = (
+		    SELECT G.SCHCODE
+		    FROM GUIDE G 
+		        JOIN GUIDEBOOK GB ON G.SCHCODE = GB.SCHCODE
+				WHERE GB.USERSCODE = (
+				    SELECT DISTINCT USERSCODE
+				    FROM PAYMENT P
+				    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+				    WHERE P.PAYCODE = #{payCode}
+				) 
+				AND WORKDATE = (
+				    SELECT DISTINCT STARTDATE 
+				    FROM PAYMENT P
+				    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+				    WHERE P.PAYCODE = #{payCode}
+				)
+		)
+	</delete>
+</mapper>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="enjoy">
+
+	<select id="dataCount" parameterType="map" resultType="Integer">
+		select count (*) FROM 
+		(select f.facilityCode, name, state, f.themeCode,originalMainFilename,saveMainFilename, memo
+	            from facility f
+	            left join theme t on f.themeCode = t.themeCode
+	            where gubunCode=1 and f.themeCode= #{code})
+	</select>
+	
+	<select id="listEnjoyCal" parameterType="map" resultType="com.sp.enjoy.Enjoy">
+		select * from (
+   		select rownum rnum, tb.* from (
+			select f.facilityCode, name, state, f.themeCode,originalMainFilename,saveMainFilename, memo
+            from facility f
+            left join theme t on f.themeCode = t.themeCode
+            where gubunCode=1 and f.themeCode= #{code}
+		<![CDATA[
+				) tb where rownum <= #{end}
+			)where rnum >= #{start}	
+		]]>
+		order by facilityCode desc
+	</select>
+	
+	
+	<select id="listEnjoy2" resultType="com.sp.enjoy.Enjoy">
+
+	   select facilityCode, name, state, originalMainFilename,saveMainFilename, memo 
+       from facility 
+       where gubunCode=1
+
+	</select>
+	
+	<select id="dialogEnjoy" parameterType="Integer" resultType="com.sp.enjoy.Enjoy">
+
+		select themeName, name, passengers, minHeight, maxHeight, limit,originalMainFilename,saveMainFilename,saveLocFilename
+		from facility f
+		join rides r on f.facilityCode=r.facilityCode
+		join theme t on f.themeCode = t.themeCode
+        where f.facilityCode=#{code}
+
+	</select>
+	
+</mapper>

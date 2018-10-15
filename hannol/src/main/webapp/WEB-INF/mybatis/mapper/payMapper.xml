@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="pay">
+	<select id="seq" resultType="Integer">
+			SELECT payment_seq.NEXTVAL FROM dual
+	</select>
+
+	<select id="couponCount" parameterType="map" resultType="com.sp.pay.MCoupon">
+		SELECT couponCode, issuedDate, startDate, endDate, memo, c.goodsCode, price, couponMngName 
+		FROM coupon c
+		JOIN goods g ON c.goodsCode = g.goodsCode 
+		JOIN couponMng cm ON cm.couponMngCode = c.couponMngCode
+		<![CDATA[
+			WHERE usersCode = #{usersCode} 
+				AND c.state = 0 
+				AND endDate >= #{curDate}
+		]]>
+	</select>
+
+	<insert id="insertPay" parameterType="com.sp.pay.Pay">
+		INSERT INTO payment(payCode, price, dcPrice, usersCode)
+		VALUES(#{payCode}, #{price}, #{dcPrice}, #{usersCode})
+	</insert>
+	
+	<insert id="insertPayInfo" parameterType="com.sp.pay.Pay">
+		INSERT INTO payInfo(payCode, payWay, payPrice)
+		VALUES(#{payCode}, #{payWay}, #{payPrice})
+	</insert>
+	
+	<insert id="insertCardInfo" parameterType="com.sp.pay.Pay">
+		INSERT INTO cardInfo(payCode, cardCo, cardNum, state, paySection)
+		VALUES(#{payCode}, #{cardCo}, #{cardNum}, #{state}, #{paySection})
+	</insert>
+	
+	<update id="insertPaymentInfo" parameterType="com.sp.pay.Pay">
+		INSERT INTO paymentInfo(paymentCode, payCode, goodsCode, quantity)
+		SELECT paymentInfo_seq.NEXTVAL, a.*
+		FROM(
+		<foreach collection="plist2" item="plist2" index="index" separator=" UNION ALL " close=")a">
+			SELECT #{payCode}, #{plist2.goodsCode}, #{plist2.quantity}
+			FROM DUAL
+		</foreach>
+	</update>
+	
+	<update id="insertTicket" parameterType="com.sp.pay.Pay">
+		INSERT INTO ticket(ticketCode, startDate, endDate, gubun, payCode, goodsCode)
+		SELECT ticket_seq.NEXTVAL, a.*
+		FROM(
+		<foreach collection="plist" item="plist" index="index" separator=" UNION ALL " close=")a">
+			SELECT #{plist.startDate}, #{plist.endDate}, #{plist.gubunCode}, #{payCode}, #{plist.goodsCode}
+			FROM dual
+		</foreach>
+	</update>
+	
+	<update id="insertGift" parameterType="com.sp.pay.Pay">
+		INSERT INTO gift(giftCode, endDate, payCode, goodsCode)
+		SELECT gift_seq.NEXTVAL, a.*
+		FROM(
+		<foreach collection="plist" item="plist" index="index" separator=" UNION ALL " close=")a">
+			SELECT #{plist.endDate}, #{payCode}, #{plist.goodsCode}
+			FROM dual
+		</foreach>
+	</update>
+	
+	<delete id="deleteCart" parameterType="com.sp.pay.Pay">
+		DELETE 
+		FROM cart 
+		WHERE cartCode IN (
+		<foreach collection="plist" item="plist" separator=",">
+			#{plist.cartCode}
+		</foreach>
+		)
+		
+	</delete>
+
+	<select id="readResult" parameterType="Integer" resultType="com.sp.pay.Pay">
+    	SELECT TO_CHAR(payDate,'YYYY-MM-DD') payDate, price, dcPrice, payPrice, cardCo, cardNum 
+	    FROM payment pm
+   		JOIN payInfo pi ON pm.payCode = pi.payCode
+    	JOIN cardInfo ci ON pm.payCode = ci.payCode
+		WHERE pm.payCode = #{payCode}
+	</select>
+	
+	<select id="isCard" parameterType="String" resultType="Integer">
+		SELECT discount FROM card WHERE cardCo LIKE #{cardCo}
+	</select>
+	
+	<update id="insertDiscount" parameterType="com.sp.pay.Pay">
+        INSERT INTO discount(dcCode, memo, dcPrice, payCode)
+		SELECT discount_seq.NEXTVAL, a.*
+		FROM(
+		<foreach collection="dclist" item="dclist" index="index" separator=" UNION ALL " close=")a">
+			SELECT #{dclist.dcWay}, #{dclist.dcPay}, #{payCode}
+			FROM dual
+		</foreach>
+    </update>
+    
+    <update id="insertCouponHistory" parameterType="java.util.List">
+        <foreach collection="couponCode" item="item" index="index"  open="INSERT ALL " separator=" " close="SELECT * FROM DUAL" > 
+         INTO couponHistory(couponCode, payCode)
+        VALUES
+            (#{item}, #{payCode})
+        </foreach>
+    </update>
+    
+    <update id="updateCoupon" parameterType="map">
+    	UPDATE coupon SET state = 1 WHERE couponCode = #{couponCode} and usersCode = #{usersCode}
+    </update>
+	
+	<select id="paylist" parameterType="map" resultType="com.sp.pay.Paylist">
+		SELECT * FROM(
+			SELECT p.payCode, payDate, payWay, payPrice, 
+    			quantity, goodsName, gg.gubunCode, gs.price, gubunName, parentCode, cardCo, paySection, ci.state,
+    			DENSE_RANK() OVER(ORDER BY TO_CHAR(payDate,'YYYY-MM-DD') DESC) rnum,
+    			(SELECT COUNT(*) FROM couponHistory WHERE payCode = p.payCode) AS couponCount
+			FROM payment p
+			JOIN payInfo pi ON p.payCode = pi.payCode
+			JOIN paymentInfo pmi ON p.payCode = pmi.payCode 
+			JOIN goods gs ON pmi.goodsCode = gs.goodsCode
+			JOIN goodsGubun gg ON gs.gubunCode = gg.gubunCode
+			JOIN cardInfo ci ON p.payCode = ci.payCode
+			WHERE usersCode = #{usersCode} AND TO_CHAR(payDate,'YYYY') LIKE #{year}
+		)
+		<![CDATA[
+		WHERE  rnum >= #{start} AND rnum <= #{end} 
+		ORDER BY payDate DESC, parentCode
+		]]>
+	</select>
+	
+	<select id="dataCount" parameterType="map" resultType="Integer">
+		SELECT COUNT(*) FROM(
+    		SELECT TO_CHAR(payDate,'YYYY-MM-DD') payDate 
+    		FROM payment
+   			WHERE usersCode = #{usersCode} AND TO_CHAR(payDate,'YYYY') LIKE #{year}
+    		GROUP BY TO_CHAR(payDate,'YYYY-MM-DD')
+    		ORDER BY payDate
+		)
+	</select>
+	
+	<select id="useDate" parameterType="map" resultType="java.util.HashMap">
+        SELECT pp.payCode
+        FROM payment pp
+        LEFT OUTER JOIN gift g ON pp.payCode = g.payCode
+        LEFT OUTER JOIN ticket t ON pp.payCode = t.payCode   
+        WHERE usersCode = #{usersCode} AND pp.payCode NOT IN(
+            SELECT p.payCode payCodelist
+            FROM payment p
+            LEFT OUTER JOIN gift g ON p.payCode = g.payCode
+            LEFT OUTER JOIN ticket t ON p.payCode = t.payCode   
+            WHERE usersCode = #{usersCode}
+                AND (useDate IS NOT NULL
+                <![CDATA[ 
+                OR TO_CHAR(g.endDate,'YYYY-MM-DD') < #{endDate})
+                OR TO_CHAR(t.startDate,'YYYY-MM-DD') < #{endDate}
+                ]]>
+            GROUP BY p.payCode
+        )
+        GROUP BY pp.payCode
+	</select>
+	
+	<update id="updateCardInfo" parameterType="Integer">
+		UPDATE cardInfo SET state = '결제취소' WHERE payCode = #{payCode}
+	</update>
+	
+	<delete id="deleteGift" parameterType="Integer">
+		DELETE FROM gift WHERE payCode = #{payCode}
+	</delete>
+	
+	<delete id="deleteTicket" parameterType="Integer">
+		DELETE FROM ticket WHERE payCode = #{payCode}
+	</delete>
+	
+	<delete id="deleteDiscount" parameterType="Integer">
+		DELETE FROM Discount WHERE payCode = #{payCode}
+	</delete>
+	
+	<select id="getCouponCode" parameterType="Integer" resultType="java.util.HashMap">
+		SELECT couponCode FROM couponHistory WHERE payCode = #{payCode}
+	</select>
+	
+	<update id="updateCouponState" parameterType="map">
+		UPDATE coupon SET state = 0 WHERE couponCode = #{couponCode}
+	</update>
+	
+	<delete id="deleteCouponHistory" parameterType="Integer">
+		DELETE FROM couponHistory WHERE payCode=#{payCode}
+	</delete>
+	
+</mapper> 

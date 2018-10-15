@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="magic">
+	<select id="checkTicket" parameterType="Long" resultType="Integer">
+		SELECT COUNT(*) FROM ticket t
+		LEFT JOIN payment p ON p.paycode =  t.paycode
+		WHERE userscode=#{usersCode}
+		AND TO_CHAR(SYSDATE, 'YYYY-MM-DD') BETWEEN startDate AND endDate
+		AND gubun IN (4, 6, 8)
+	</select>
+	
+	<select id="dataCount" parameterType="map" resultType="Integer">
+	 	SELECT COUNT(*)
+        FROM facility f
+        LEFT JOIN rides r ON f.facilityCode = r.facilityCode
+        WHERE state=1 AND f.gubunCode=1
+        <if test="searchValue !=null and searchValue !=''">
+          AND INSTR(name, #{searchValue}) &gt; 0
+        </if>
+        <if test="themeCode != 0">
+        	AND themeCode = #{themeCode}
+        </if>
+	</select>
+	
+	<select id="listRides" parameterType="map" resultType="com.sp.magicpass.MagicPass">
+		SELECT * FROM(
+		    SELECT ROWNUM rnum, tb.* FROM (
+		        SELECT f.facilityCode, name, state, saveMainFileName, f.gubunCode, themeCode, congestion
+		        FROM facility f
+		        LEFT JOIN rides r ON f.facilityCode = r.facilityCode
+		        WHERE state=1 AND f.gubunCode=1
+		        <if test="searchValue !=null and searchValue !=''">
+		          AND INSTR(name, #{searchValue}) &gt; 0
+		        </if>
+		        <if test="themeCode != 0">
+		        	AND themeCode = #{themeCode}
+		        </if>
+		        ORDER BY congestion DESC
+		    ) tb
+		    WHERE ROWNUM &lt;=#{end}
+		) WHERE rnum &gt;=#{start}
+	</select>
+	
+	<select id="listReservation" parameterType="Long" resultType="com.sp.magicpass.MagicPass">
+		SELECT mpTime, COUNT(mpTime) cnt FROM magicpass
+		WHERE TO_CHAR(mpDate, 'YYYY-MM-DD') = TO_CHAR(SYSDATE, 'YYYY-MM-DD')
+		AND facilityCode=#{facilityCode}
+		GROUP BY mpTime
+		ORDER BY mpTime ASC
+	</select>
+	
+	<select id="getTicket" parameterType="Map" resultType="com.sp.magicpass.MagicPass">
+		SELECT ticketCode AS ticketsCode, goodsName, usersCode, gubun AS ticketGubun, gubunName
+		FROM ticket t
+		JOIN goods g ON t.goodsCode=g.goodsCode
+		JOIN payment p ON p.payCode = t.payCode
+		JOIN goodsGubun b ON gubun = b.gubuncode
+		WHERE #{today} BETWEEN TO_CHAR(startDate, 'YYYY-MM-DD') AND TO_CHAR(endDate, 'YYYY-MM-DD')	
+		AND g.GUBUNCODE IN (4, 6, 8)
+		AND usersCode=#{usersCode}
+	</select>
+	
+	<insert id="insertReservation" parameterType="com.sp.magicpass.MagicPass">
+		INSERT INTO magicpass(mpCode, mpDate, mpTime, facilityCode, ticketCode, usersCode)
+    	VALUES(magicpass_seq.nextval, SYSDATE, #{mpTime}, ${facilityCode}, ${ticketsCode}, #{usersCode})
+	</insert>
+	
+	<select id="checkReservation" parameterType="com.sp.magicpass.MagicPass" resultType="Integer">
+		SELECT COUNT(*) FROM magicpass
+		WHERE mpTime=#{mpTime} AND usersCode=#{usersCode}
+		AND TO_CHAR(mpDate, 'YYYY-MM-DD') = #{mpDate}
+		AND ticketCode=#{ticketsCode}
+	</select>
+	
+	<delete id="deleteMagicpassAll" parameterType="Integer">
+		DELETE FROM magicpass WHERE ticketCode IN (
+		    SELECT TICKETCODE FROM ticket WHERE PAYCODE=#{paycode}
+		)
+	</delete>
+</mapper>

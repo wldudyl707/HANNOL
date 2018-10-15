@@ -1,0 +1,122 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>  
+<beans:beans xmlns="http://www.springframework.org/schema/security"
+	xmlns:beans="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/security
+		http://www.springframework.org/schema/security/spring-security.xsd">
+
+	<context:component-scan base-package="com.sp"/>
+	
+    <!-- 권한이 없는 페이지를 접근할 경우 접근 불가 메시지 출력  -->
+	<http auto-config="true">
+		<!-- spring 4.x때 추가된 옵션으로 ssl을 사용하지 않을 경우 csrf는 disalbed=true로 설정. -->
+		<csrf disabled="true"/>
+		
+		<!-- 모든 사용자 접근 허용 -->
+		<!-- **보다 permitAll이 순위가 높기 때문에 먼저 풀어줄것 풀어주고, 그 다음에 접근 못하게 막도록한다. -->
+		<intercept-url pattern="/index.jsp" access="permitAll"/>
+		<intercept-url pattern="/main" access="permitAll"/>
+		<intercept-url pattern="/member/login" access="permitAll"/>
+		<intercept-url pattern="/member/member" access="permitAll"/><!-- 회원가입 -->
+		<intercept-url pattern="/member/userIdCheck" access="permitAll"/>
+		<intercept-url pattern="/member/userEmailCheck" access="permitAll"/>
+		<intercept-url pattern="/member/logout" access="permitAll"/>
+		<intercept-url pattern="/resource/**" access="permitAll"/> <!-- img,css,javascript -->
+		<intercept-url pattern="/uploads/**" access="permitAll" /> <!-- 게시글 관련 이미지 -->
+		
+		<!-- 회사소개 -->
+		<intercept-url pattern="/company/**" access="permitAll"/>
+		<intercept-url pattern="/ticket/list" access="permitAll"/>
+		<intercept-url pattern="/card/list" access="permitAll"/>
+		
+		<!-- 오늘의파크 -->
+		<intercept-url pattern="/todayPark/**" access="permitAll"/>
+		
+		<!-- 매직패스 -->
+		<intercept-url pattern="/magicPass/rides" access="permitAll"/>
+		
+		
+		<!-- 즐길거리 -->
+		<intercept-url pattern="/enjoy/**" access="permitAll"/>
+		<intercept-url pattern="/show/**" access="permitAll"/>
+
+		<!-- 편의시설 -->
+		<intercept-url pattern="/facilities/**" access="permitAll"/>
+
+		<!-- 기프트샵 -->
+		<intercept-url pattern="/giftshop/list" access="permitAll"/>
+		<intercept-url pattern="/giftshop/aJaxList" access="permitAll"/>
+		<intercept-url pattern="/giftshop/article" access="permitAll"/>
+		
+		<!-- 소통 -->
+		<intercept-url pattern="/notice/**" access="permitAll"/>
+		<intercept-url pattern="/event/**" access="permitAll"/>
+		<intercept-url pattern="/faq/**" access="permitAll"/>
+		<intercept-url pattern="/question/question" access="permitAll"/>
+		<intercept-url pattern="/review/list" access="permitAll"/>
+		<intercept-url pattern="/review/listReview" access="permitAll"/>
+		<intercept-url pattern="/review/createForm" access="permitAll"/>
+		
+		<!-- 카카오인증 -->
+		<intercept-url pattern="/member/kakao_oauth" access="permitAll"/> 
+	
+		<intercept-url pattern="/**" access="hasAnyRole('ROLE_USER', 'ROLE_ADMIN')"/> 
+		
+		<!-- 사용자 정의 로그인 폼 -->
+		<!-- login-processing-url : login.jsp의 action에서 수행할 주소 -->
+		<!-- username-parameter, password-parameter : login.jsp의 폼 태그 안에 존재하는 이름 -->
+		<form-login login-page="/member/login" 
+					login-processing-url="/member/login" 
+					username-parameter="userId" 
+					password-parameter="userPwd"
+					authentication-failure-url="/member/login?login_error"
+					authentication-success-handler-ref="authenticationSuccessHandler"
+					default-target-url="/main"
+					always-use-default-target="true" 
+		/>
+		
+		<!-- 로그아웃 -->
+		<logout logout-url="/member/logout"
+				invalidate-session="true"
+				logout-success-url="/"
+		/>
+		
+		<!-- 접근 권한이 없는 경우 경고 메세지 -->
+		<access-denied-handler error-page="/member/noAuthorized"/>
+		
+		<!-- 동일한 아이디로 동시 접속 불가 -->
+		<session-management>
+			<concurrency-control max-sessions="1" expired-url="/member/expired"/>
+		</session-management>
+	</http>
+	
+	<!-- 객체생성 -->
+	<beans:bean id="authenticationSuccessHandler" class="com.sp.member.MyAuthenticationSuccessHandler">
+		<beans:property name="defaultTargetUrl" value="/main"/>
+		<beans:property name="alwaysUseDefaultTargetUrl" value="true"/> <!-- 로그인시 메인화면으로 가도록 -->
+	</beans:bean>
+    
+    <jdbc-user-service data-source-ref="dataSource" id="userService"
+    					users-by-username-query="SELECT memberId username, memberPwd password, enabled FROM member1 WHERE memberId=?"
+    					authorities-by-username-query="SELECT memberId username, authority FROM member1 WHERE memberId=?"
+    />
+    
+    <!-- bcrypt : 패스워드 암호화에 특화된 password hashing function -->
+    <!-- 암호화를 할때마다 랜덤한 키값을 뽑으므로 다 다른값이 나온다. -->
+    <beans:bean id ="bcryptPassword" 
+    	class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder"></beans:bean>
+    
+    <!-- 패스워드 해쉬 함수 -->
+	<authentication-manager>
+		<authentication-provider user-service-ref="userService">
+			<password-encoder ref="bcryptPassword"/>
+		</authentication-provider>
+	</authentication-manager>
+
+</beans:beans>

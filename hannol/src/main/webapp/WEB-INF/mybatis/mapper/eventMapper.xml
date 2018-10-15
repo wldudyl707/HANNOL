@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="event">
+	<select id="dataCount" resultType="Integer">
+		SELECT NVL(COUNT(*),0) FROM EVENT WHERE STATE=1
+	</select>
+	
+	<select id="readEvent" parameterType="Integer" resultType="com.sp.event.Event">
+		SELECT E.eventCode, E.subject, E.content,
+		E.saveFilename, E.originalFilename,
+		TO_CHAR(E.startDate, 'YYYY-MM-DD') startDate, TO_CHAR(E.endDate, 'YYYY-MM-DD') endDate, 
+		E.state,TO_CHAR(E.created, 'YYYY-MM-DD') created, E.usersCode,
+		SI.STAFFID
+		FROM EVENT E
+        JOIN STAFF S ON S.USERSCODE = E.USERSCODE
+        JOIN STAFFINFO SI ON S.USERSCODE = SI.USERSCODE
+		WHERE EVENTCODE = #{eventCode}
+	</select>
+	
+	<select id="listEvent" parameterType="map" resultType="com.sp.event.Event">
+		SELECT * FROM (
+		    SELECT ROWNUM rnum, tb.* FROM (
+			    SELECT E.eventCode, E.subject, E.content,
+                E.saveFilename, E.originalFilename,
+                TO_CHAR(E.startDate, 'YYYY-MM-DD') startDate, TO_CHAR(E.endDate, 'YYYY-MM-DD') endDate, 
+                E.state, TO_CHAR(E.created, 'YYYY-MM-DD') created, E.usersCode,
+                SI.STAFFID
+                FROM EVENT E
+                JOIN STAFF S ON S.USERSCODE = E.USERSCODE
+                JOIN STAFFINFO SI ON S.USERSCODE = SI.USERSCODE
+                WHERE STATE=1
+	            ORDER BY eventCode DESC
+	    <![CDATA[        
+	        ) tb WHERE ROWNUM <= #{end}
+	    ) WHERE rnum >= #{start}
+	    ]]>
+	</select>
+	
+</mapper>

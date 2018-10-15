@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="assets">
+	<!-- 테마 리스트 -->
+	<select id="listTheme" resultType="map">
+		SELECT themeCode, themeName 
+		FROM theme WHERE themeCode!=4
+	</select>
+	
+	<!-- 구입한 이용권 검색 -->
+	<select id="searchPayment" resultType="map" parameterType="Long"> 
+		SELECT DISTINCT p.payCode, TO_CHAR(endDate, 'YYYY-MM-DD') endDate, usersCode, quantity, g.goodsCode, goodsName
+		FROM payment p
+		LEFT OUTER JOIN paymentInfo pi ON p.payCode = pi.payCode
+		LEFT OUTER JOIN goods g ON pi.goodsCode = g.goodsCode
+		LEFT OUTER JOIN ticket t ON p.payCode = t.payCode
+		WHERE usersCode = #{usersCode} AND TO_CHAR(SYSDATE, 'YYYY-MM-DD') &lt; endDate
+		ORDER BY endDate
+	</select>
+	
+	<!-- 구입한 이용권 검색vs2 -->
+	<!-- <select id="searchPayment2" resultType="map" parameterType="map"> 
+		SELECT DISTINCT goodsName
+		FROM payment p
+		LEFT OUTER JOIN paymentInfo pi ON p.payCode = pi.payCode
+		LEFT OUTER JOIN goods g ON pi.goodsCode = g.goodsCode
+		LEFT OUTER JOIN ticket t ON p.payCode = t.payCode
+		WHERE usersCode = #{usersCode} AND endDate = #{endDate}
+		ORDER BY endDate
+	</select> -->
+	
+	<!-- 테마별, 편의시설별 대여소의 자산 검색(해당 당일만) -->
+	<select id="searchFacility" resultType="map" parameterType="map">
+		SELECT ROWNUM, tb.* FROM(
+		    SELECT assetsCode, a.facilityCode, name 
+		    FROM assets a
+		    LEFT OUTER JOIN facility f ON a.facilityCode = f.facilityCode
+		    WHERE a.gubunCode=#{gubunCode} AND f.themeCode=#{themeCode} AND state=1 AND 
+		            assetsCode NOT IN(
+		            	SELECT assetsCode FROM assetsBook WHERE TO_CHAR(useDate, 'YYYY-MM-DD') = #{useDate} 
+		            )
+		    ORDER BY assetsCode
+		)tb WHERE ROWNUM=1
+	</select>
+	
+	<!-- 예약 추가 -->
+	<insert id="insertAssetsBook" parameterType="com.sp.assets.Assets">
+		INSERT INTO assetsBook(bookCode, useDate, bookTime, state, tel, usersCode, assetsCode, name, ticketCode)  
+		VALUES (assetsBook_seq.NEXTVAL, #{useDate}, #{bookTime}, 0, #{tel}, #{usersCode}, #{assetsCode}, #{name}, #{ticketCode})
+	</insert>
+	
+	<!-- 예약내역이 있는지 검색 -->
+	<select id="searchReservation" resultType="Integer" parameterType="map">
+		SELECT COUNT(*)
+		FROM assetsBook ab
+		LEFT OUTER JOIN assets a ON ab.assetsCode = a.assetsCode
+		WHERE usersCode=#{usersCode} AND TO_CHAR(useDate, 'YYYY-MM-DD') = #{useDate} AND gubunCode=#{gubunCode}
+	</select>
+	
+	<!-- 해당 날짜에 이용권 여부 확인 -->
+	<select id="checkTicketCount" parameterType="map" resultType="Integer">
+		SELECT COUNT(*) 
+		FROM ticket t
+		JOIN payment p ON p.payCode = t.payCode
+		WHERE usersCode = #{usersCode}
+		AND (#{selectDay} BETWEEN startDate AND endDate OR gubun=8) 
+	</select>
+	
+	<!-- 이용권 검색(야간권 찾기 위해서) -->
+	<!-- <select id="searchTicket" resultType="Integer" parameterType="Long">
+		SELECT NVL(COUNT(*), 0)
+		FROM payment p 
+		JOIN ticket t ON p.payCode = t.payCode
+		WHERE usersCode = #{usersCode} AND gubun IN(5, 6)
+	</select> -->
+	
+	<!-- 이용권 리스트 -->
+	<select id="ticketList" resultType="map" parameterType="Long">
+		SELECT DISTINCT ticketCode AS ticketsCode, goodsName, gubunName, usersCode, gubun AS ticketGubun 
+		FROM ticket t
+		JOIN goods g ON t.goodsCode=g.goodsCode
+		JOIN goodsGubun gg ON g.gubunCode=gg.gubunCode
+		JOIN payment p ON p.payCode = t.payCode
+		WHERE TO_CHAR(SYSDATE, 'YYYY-MM-DD') BETWEEN TO_CHAR(startDate, 'YYYY-MM-DD') AND TO_CHAR(endDate, 'YYYY-MM-DD')   
+		AND usersCode=#{usersCode}
+	</select>
+	
+	<!-- 보관함 -->
+	<select id="listCube" parameterType="map" resultType="com.sp.assets.Assets">
+		select a.bookCode, bookDate, useDate, bookTime, a.state, tel, usersCode, a.assetsCode, a.name ,lockernum
+			from assetsBook a
+			join assets s on s.assetsCode = a.assetsCode 
+			join facility f on f.facilityCode = s.facilityCode
+			join theme t on f.themeCode = t.themeCode
+			join lockerInfo l on l.bookCode = a.bookCode
+			where useDate = #{pickDate} and bookTime=#{daynum}
+	</select>
+	
+	<select id="checkUserDate" parameterType="map" resultType="Integer">
+		select count(*) from(
+			select a.bookCode 
+			from assetsBook a 
+			join lockerInfo l on l.bookCode=a.bookCode
+			where useDate =#{pickDate} and bookTime=#{daynum} and lockerNum=#{lockerNum})
+	</select>
+	
+	<insert id="insertCube" parameterType="map" >
+		insert into assetsBook(bookCode, bookDate, useDate, bookTime, state, tel, usersCode, assetsCode, name) 
+		values(assetsBook_seq.Nextval, to_date(#{date},'yyyymmdd'), to_date(#{pickDate},'yyyy-mm-dd'), #{daynum}, 0, #{tel}, #{usersCode}, #{assetsCode}, #{name})
+	</insert>
+	
+<!-- 	<insert id="insertCube1" parameterType="map" >
+		insert into assetsBook(bookCode, bookDate, useDate, bookTime, state, tel, usersCode, assetsCode, name) 
+		values(assetsBook_seq.Nextval, to_date(#{date},'yyyymmdd'), to_date(#{pickDate},'yyyy-mm-dd'), 1, 0, #{tel}, #{usersCode}, 3, #{name})
+	</insert> -->
+	
+	<select id="checkCode" parameterType="map" resultType="Integer">
+		select bookCode from
+		(select rownum rnum, tb.* from
+		(select a.bookCode 
+				from assetsBook a 
+				where useDate =#{pickDate} and bookTime=#{daynum} and userscode=#{usersCode}
+		        order by a.bookCode desc)tb)
+		where rnum=1
+		
+	</select>
+	
+	<select id="assetsCode" parameterType="map" resultType="Integer">
+		select assetsCode from
+			(select rownum rnum, tb.* from
+			(select *from assets a 
+			join facility f on f.facilityCode=a.facilityCode
+			where a.gubunCode=3 and themeCode=#{themeCode})tb)
+					where rnum=1
+	</select>
+	
+	<insert id="insertCube2" parameterType="map">
+		INSERT INTO LockerInfo(lockerNum, bookCode)
+ 		   values(#{lockerNum}, #{code})
+	</insert>
+	
+	<select id="checkMulti" parameterType="map" resultType="Integer">
+		select count(*) from (select bookCode from assetsBook  where usersCode=#{usersCode})
+	</select>
+	
+<!-- 	<select id="checkAll" parameterType="map" resultType="Integer">
+		select count(*) from (select bookCode from assetsBook where bookTime=0)
+	</select> -->
+	
+	<select id="checkGoods" parameterType="map" resultType="Integer">
+		<!-- select distinct g.gubunCode from assetsBook a
+			join payment p on a.usersCode =p.usersCode
+			join paymentInfo i on p.payCode = i.payCode
+			join goods g on g.goodsCode = i.goodsCode
+			where a.usersCode = #{usersCode} and useDate = #{pickDate}  -->
+			
+<!-- 			select distinct g.gubunCode from member1 m
+				join payment p on m.usersCode = p.usersCode
+				join paymentInfo i on i.payCode = p.payCode
+				join goods g on g.goodsCode = i.goodsCode
+				where m.usersCode = #{usersCode} -->
+			
+			select gubunCode from
+			(select rownum rnum, tb.*from
+			    (select distinct g.gubunCode from member1 m
+			        join payment p on m.usersCode = p.usersCode
+			    	join paymentInfo i on i.payCode = p.payCode
+			        join goods g on g.goodsCode = i.goodsCode
+			    where m.usersCode = #{usersCode})
+			    tb)
+			where rnum=1
+			
+	</select>
+	
+	<select id="cancelCode" parameterType="map" resultType="Integer">
+		select bookCode from
+		(select rownum rnum, tb.* from
+		(select a.bookCode 
+				from assetsBook a 
+				where userscode=#{usersCode}
+		        order by a.bookCode desc)tb)
+		where rnum=1
+	</select>
+	
+	<delete id="cancel" parameterType="map">
+		
+		delete from assetsBook where assetsCode =(
+		select assetsCode from
+		(select rownum rnum, tb.* from
+		(select * from assetsBook
+				where usersCode = #{usersCode} order by bookcode desc
+		        )tb)
+				where rnum=1)
+	</delete>
+	
+	<delete id="cancelLocknum" parameterType="Integer">
+		delete from lockerInfo
+		where bookCode=#{code}
+	</delete>
+	
+	<select id="getCubeBookCancelDay" parameterType="Integer" resultType="com.sp.assets.Assets">
+		select bookCode, useDate,usersCode
+		from assetsBook 
+		where usersCode = (
+		    SELECT DISTINCT USERSCODE
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+		) 
+		AND useDate = (
+		    SELECT DISTINCT STARTDATE 
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+		)
+		and assetsCode=3
+	</select>
+	
+	<select id="okTicketIfPayCancledCube" parameterType="Integer" resultType="Integer">
+		SELECT NVL(COUNT(*),0)
+		FROM PAYMENT P
+		JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		WHERE USERSCODE = (
+            SELECT DISTINCT USERSCODE
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+        )
+        AND STARTDATE = (
+		    SELECT DISTINCT STARTDATE 
+		    FROM PAYMENT P
+		    JOIN TICKET T ON P.PAYCODE = T.PAYCODE
+		    WHERE P.PAYCODE = #{payCode}
+		)
+		AND P.PAYCODE != #{payCode}
+	</select>
+	
+	<select id="payBookCode" parameterType="Integer" resultType="Integer">
+		select bookCode from assetsBook a
+			join member1 m on a.usersCode = m.usersCode
+			join payment p on a.usersCode = p.usersCode
+			where payCode=#{payCode}
+	</select>
+	
+	<delete id="paydeleteLocker" parameterType="Integer">
+		delete from lockerInfo
+		where bookCode=#{cubepayCode}
+	</delete>
+	
+	<delete id="paydeleteBook" parameterType="Integer">
+		delete from assetsBook
+		where bookCode=#{cubepayCode}
+	</delete>
+</mapper>
